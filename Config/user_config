@@ -1,9 +1,12 @@
 {
 
-"Email": "example@gmail.com",
-"Password": "example123",
+    "Email": "example@gmail.com",
+    "Password": "example123",
 
-"Minimum_Delay": 3,
-"Maximum_Delay": 3
+    "Minimum_Delay": 1,
+    "Maximum_Delay": 3,
+    "Rate_Limit_Delay": 7,
+
+    "Proxy": "26012PVwg3-resi_region-US_Virginia_Ashburn:IJLR8tGYD3k@ca.proxy-jet.io:1010"
 
 }
