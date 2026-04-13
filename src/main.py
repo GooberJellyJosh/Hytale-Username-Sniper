@@ -21,9 +21,6 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-"""
-
-"""
 
 ##--FUNCTIONS--
 def import_user_config():
@@ -35,7 +32,7 @@ def import_user_config():
         config = json.load(f)
     with open("../Config/name_list", "r") as f:
         dict = json.load(f)
-        list_of_names = dict.keys()
+        list_of_names = list(dict.keys())
     print(f"Imported {len(list_of_names)} names.")
     print(f"min_delay: {config['Minimum_Delay']}, max_delay: {config['Maximum_Delay']}, rate_limit_delay: {config['Rate_Limit_Delay']}")
 
@@ -85,6 +82,7 @@ def start_chrome_with_proxy(proxy):
     chrome_options.add_argument(f"--user-data-dir={profile_dir}")
     chrome_options.add_argument("--disable-webrtc")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+    chrome_options.add_experimental_option("detach", True)
 
     seleniumwire_options = {
         "proxy": {
@@ -127,30 +125,52 @@ def login(email, password):
         except:
             print("Error: Couldn't find login buttons or inputs.")
 
+def input_name(name):
+    input_element = driver.find_element(By.XPATH, '//*[@id="modal-0e4d3ecc-1c04-4277-98b8-47b5d8a01a21"]')
+    input_element.clear()
+    WebDriverWait(driver, 10).until(
+        lambda a: input_element.get_attribute("value") == ""
+    )
+    input_element.clear()
 
-total_name_change_attempts = 0
+    time.sleep(rd.uniform(0.1, 0.5))
+    for letter in name:
+        input_element.send_keys(letter)
+        time.sleep(0.1)
+    time.sleep(0.2)
+
+def name_is_correct(name):
+    input_element = driver.find_element(By.XPATH, '//*[@id="modal-0e4d3ecc-1c04-4277-98b8-47b5d8a01a21"]')
+    if input_element.get_attribute("value") == name:
+        return True
+    else:
+        return False
+
 
 def change_Name(list_of_names, min_delay, max_delay, rate_limit_delay):
-    global total_name_change_attempts
-
+    total_name_change_attempts = 0
     index = 0
     while index <= len(list_of_names):
         name = list_of_names[index]
         # Finds input element and sends username
         WebDriverWait(driver, 120).until(
             EC.presence_of_element_located((By.XPATH, '//*[@id="modal-0e4d3ecc-1c04-4277-98b8-47b5d8a01a21"]'))
+            # EC.presence_of_element_located((By.ID, "modal-0e4d3ecc-1c04-4277-98b8-47b5d8a01a21"))
         )
         try:
-            input_element = driver.find_element(By.XPATH, '//*[@id="modal-0e4d3ecc-1c04-4277-98b8-47b5d8a01a21"]')
-            submit_button = driver.find_element(By.XPATH, '//*[@id="game-profiles"]/div/div[2]/div/form/button')
-            input_element.clear()
-            WebDriverWait(driver, 10).until(
-                lambda a: input_element.get_attribute("value") == ""
-            )
-            for letter in name:
-                input_element.send_keys(letter)
-                time.sleep(rd.uniform(0.1, 0.3))
-                submit_button.click()
+
+            input_name(name)
+            if not name_is_correct(name):
+                input_element = driver.find_element(By.XPATH, '//*[@id="modal-0e4d3ecc-1c04-4277-98b8-47b5d8a01a21"]')
+                input_element.clear()
+                input_name(name)
+
+            # submit_button.click()
+
+            # time.sleep(rd.uniform(0.1, 0.5))
+            # input_element.send_keys(name)
+            # time.sleep(0.2)
+            # submit_button.click()
         except:
             pass
 
@@ -179,28 +199,37 @@ def change_Name(list_of_names, min_delay, max_delay, rate_limit_delay):
 
         # Sleeps if response code was unsuccessful.
         # sleep time adapts according to previous response codes.
+        input_element = driver.find_element(By.XPATH, '//*[@id="modal-0e4d3ecc-1c04-4277-98b8-47b5d8a01a21"]')
         random_delay = rd.uniform(min_delay, max_delay)
         total_delay = 0
+        attempted_name = input_element.get_attribute("value")
         if response_code >= 400:
             total_delay += (rate_limit_delay)
-            print_info(name, response_code, total_name_change_attempts, total_delay)
-            time.sleep(30)
+            print_info(attempted_name, response_code, total_name_change_attempts, total_delay)
+            time.sleep(rate_limit_delay)
         elif 300 < response_code < 400:
             total_delay += random_delay
-            print_info(name, response_code, total_name_change_attempts, total_delay)
+            print_info(attempted_name, response_code, total_name_change_attempts, total_delay)
             time.sleep(random_delay)
         elif response_code == 200:
             total_delay += random_delay
-            print_info(name, response_code, total_name_change_attempts, total_delay)
+            print_info(attempted_name, response_code, total_name_change_attempts, total_delay)
             time.sleep(random_delay)
-            if is_still_available():
-                click_submit_button()
+            if name_is_correct(name):
+                if is_still_available():
+                    click_submit_button()
+                    input_element.send_keys(Keys.ENTER)
+                    print("Tried to submit.")
+                else:
+                    index += 1
             else:
-                index += 1
+                print("Error: incorrect input.")
+
         else:
             total_delay += random_delay
             print_info(name, response_code, total_name_change_attempts, total_delay)
             time.sleep(random_delay)
+
 
 def is_still_available():
     try:
@@ -222,8 +251,8 @@ def click_submit_button():
         pass
 
 def get_ip(driver):
-    driver.get("https://api.ipify.org")
     try:
+        driver.get("https://api.ipify.org")
         return driver.page_source.split('>')[6].split('<')[0]
     except:
         return "Error: Couldn't get IP."
@@ -242,35 +271,39 @@ def print_info(name, response_code, total_name_change_attempts, total_delay):
 URL = "https://accounts.hytale.com/profiles"
 list_of_names, email, password, min_delay, max_delay, rate_limit_delay, proxy = import_user_config()
 
-while True:
-    # Opens browser and loads website
-    service  = Service(executable_path="chromedriver.exe")
-    if proxy != "":
-        driver, prof = start_chrome_with_proxy(proxy)
-    else:
-        driver, prof = start_chrome_with_normal_profile()
+try:
+    while True:
+        # Opens browser and loads website
+        service  = Service(executable_path="chromedriver.exe")
+        if proxy != "":
+            driver, prof = start_chrome_with_proxy(proxy)
+        else:
+            driver, prof = start_chrome_with_normal_profile()
 
-    # Gets the IP being used so you can ensure that the proxy worked
-    print(f"IP: {get_ip(driver)}")
+        # Gets the IP being used so you can ensure that the proxy worked
+        print(f"IP: {get_ip(driver)}")
 
-    # Opens website
-    driver.get(URL)
-    time.sleep(1)
 
-    # Tries to login
-    try:
-        login(email, password)
-    except:
-        print("Error: Couldn't login.")
+        # Opens website
+        driver.get(URL)
+        time.sleep(1)
 
-    # Waits for user to start the bot
-    input("Press any key to start bot...")
+        # Tries to login
+        try:
+            login(email, password)
+        except:
+            print("Error: Couldn't login.")
 
-    # Tries to change username
-    try:
-        change_Name(list_of_names, min_delay, max_delay, rate_limit_delay)
-    except:
-        print("Error: change_name function didn't work.")
+        # Waits for user to start the bot
+        input("Press any key to start bot...")
+        time.sleep(0)
 
-    print(f"Total name change attempts: {total_name_change_attempts}")
-    shutil.rmtree(prof, ignore_errors=True)
+        # Tries to change username
+        try:
+            change_Name(list_of_names, min_delay, max_delay, rate_limit_delay)
+        except:
+            print("Error: change_name function didn't work.")
+
+        shutil.rmtree(prof, ignore_errors=True)
+except Exception as e:
+    input("Press any key to close the browser...")
